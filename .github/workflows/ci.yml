@@ -1,0 +1,66 @@
+name: CI/CD
+
+# "Par exemple GitLab CI" (sujet) — substitution equivalente par GitHub
+# Actions, cohérent avec les autres substitutions d'outils illustratifs
+# faites dans ce projet (voir README des depots precedents).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Tests unitaires + non-regression du modele
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # Pas de LFS ici : les tests unitaires mockent les modeles, et le
+        # test de non-regression ne lit que models/metriques.json (petit
+        # fichier JSON en Git normal) — job volontairement legere.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer les dependances
+        run: pip install -r requirements.txt
+      - name: Tests unitaires (modeles mockes)
+        run: pytest tests/test_criticite.py tests/test_main.py -v
+      - name: Tests de non-regression du modele
+        run: pytest tests/test_regression_modele.py -v
+
+  build-image:
+    name: Conteneurisation
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # necessaire ici : le Dockerfile copie les vrais modeles
+      - name: Construire l'image Docker
+        run: docker build -t automeca-maintenance-api:${{ github.sha }} .
+      - name: Verifier que l'image demarre et repond (sante)
+        run: |
+          docker run -d --name test-api -p 8000:8000 -e API_KEY=cle-ci automeca-maintenance-api:${{ github.sha }}
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/sante && break
+            sleep 2
+          done
+          curl -sf http://localhost:8000/sante
+          docker rm -f test-api
+
+  deploiement:
+    name: Deploiement (Edge/Cloud) + registre de modeles — differe
+    needs: build-image
+    runs-on: ubuntu-latest
+    if: false
+    # Desactive volontairement : l'infrastructure OVHcloud n'est pas
+    # encore provisionnee (decision prise en cours de projet — voir
+    # memoire de decision : provisionner une fois tous les blocs prets,
+    # pas au fil de l'eau, pour eviter de payer une infra qui tourne a
+    # vide pendant le developpement). A activer avec les vraies
+    # informations de connexion au registre de conteneurs et a
+    # l'infrastructure de deploiement, sans changer la structure du
+    # pipeline ci-dessus.
+    steps:
+      - run: echo "Deploiement reel a activer une fois l'infrastructure OVHcloud provisionnee (push de l'image vers un registre, deploiement, versionnement des modeles)."

@@ -1,0 +1,22 @@
+{
+  "isolation_forest": {
+    "hyperparametres": {
+      "contamination": 0.05,
+      "max_samples": 1024,
+      "n_estimators": 300
+    },
+    "auc_test": 0.9311659429912238,
+    "auc_cv_moyen": 0.9316248967437115,
+    "auc_cv_std": 0.002944236704124865
+  },
+  "random_survival_forest": {
+    "hyperparametres": {
+      "max_features": "sqrt",
+      "min_samples_leaf": 5,
+      "n_estimators": 300
+    },
+    "c_index_test": 0.7953324729818388,
+    "c_index_cv_moyen": 0.7844144713625927,
+    "c_index_cv_std": 0.019306277402722255
+  }
+}

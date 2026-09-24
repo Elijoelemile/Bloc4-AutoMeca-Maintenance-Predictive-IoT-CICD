@@ -32,15 +32,21 @@ obligatoire pour les criticités élevées.
 
 ```
 Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
+├── .github/workflows/
+│   └── ci.yml                 # tests -> conteneurisation -> deploiement (differe, voir README)
 ├── app/
 │   ├── criticite.py      # logique de criticite (anomalie + RUL), degradation gracieuse
 │   └── main.py             # API FastAPI : tickets GMAO, authentification, garde-fou
 ├── models/                  # copies des modeles du depot solution-IA (Git LFS, voir Prerequis)
 │   ├── isolation_forest.joblib
-│   └── random_survival_forest.joblib
+│   ├── random_survival_forest.joblib
+│   └── metriques.json          # metriques extraites (petit fichier, PAS en LFS) pour les tests de non-regression
 ├── tests/
-│   ├── test_criticite.py    # 8 tests, modeles mockes
-│   └── test_main.py          # 8 tests, API + garde-fou, modeles mockes
+│   ├── test_criticite.py       # 8 tests, modeles mockes
+│   ├── test_main.py             # 8 tests, API + garde-fou, modeles mockes
+│   └── test_regression_modele.py # 3 tests, lit models/metriques.json (pas les .joblib)
+├── Dockerfile                  # construit et verifie (image demarre, /sante repond)
+├── .dockerignore
 ├── .env.example
 ├── .gitattributes            # Git LFS : *.joblib
 ├── .gitignore
