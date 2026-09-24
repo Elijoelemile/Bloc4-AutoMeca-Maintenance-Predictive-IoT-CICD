@@ -37,6 +37,16 @@ def _modeles_factices(anomalie_predite: int, proba_panne: float) -> dict:
     }
 
 
+def _explainers_factices() -> dict:
+    import numpy as np
+
+    explainer_anomalie = MagicMock()
+    explainer_anomalie.shap_values.return_value = np.array([[0.9, -0.1]])
+    explainer_rul = MagicMock()
+    explainer_rul.shap_values.return_value = np.array([[0.2, -0.8]])
+    return {"anomalie": explainer_anomalie, "rul": explainer_rul}
+
+
 @pytest.fixture(autouse=True)
 def _reset_tickets():
     TICKETS.clear()
@@ -124,6 +134,70 @@ def test_degradation_capteur_renvoie_422_pas_un_crash():
                 "/predictions/ticket", json={"machine_id": 42, "mesures": {}}, headers=EN_TETE_AUTH,
             )
     assert reponse.status_code == 422
+
+
+def test_lister_tickets_vide_au_depart():
+    reponse = client.get("/tickets", headers=EN_TETE_AUTH)
+    assert reponse.status_code == 200
+    assert reponse.json() == []
+
+
+def test_lister_tickets_renvoie_tous_les_tickets():
+    with patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=1, proba_panne=0.1)):
+        client.post("/predictions/ticket", json={"machine_id": 1, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH)
+    with patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=-1, proba_panne=0.9)):
+        client.post("/predictions/ticket", json={"machine_id": 2, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH)
+
+    reponse = client.get("/tickets", headers=EN_TETE_AUTH)
+    assert reponse.status_code == 200
+    assert len(reponse.json()) == 2
+
+
+def test_lister_tickets_filtre_par_statut():
+    with patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=1, proba_panne=0.1)):
+        client.post("/predictions/ticket", json={"machine_id": 1, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH)
+    with patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=-1, proba_panne=0.9)):
+        client.post("/predictions/ticket", json={"machine_id": 2, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH)
+
+    reponse = client.get(
+        "/tickets", params={"statut": "en_attente_validation_technicien_senior"}, headers=EN_TETE_AUTH,
+    )
+    corps = reponse.json()
+    assert len(corps) == 1
+    assert corps[0]["machine_id"] == 2
+
+
+def test_lister_tickets_necessite_authentification():
+    reponse = client.get("/tickets")
+    assert reponse.status_code == 401
+
+
+def test_expliquer_ticket_introuvable():
+    reponse = client.get("/tickets/inexistant/explication", headers=EN_TETE_AUTH)
+    assert reponse.status_code == 404
+
+
+def test_expliquer_ticket_renvoie_les_facteurs():
+    with (
+        patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=1, proba_panne=0.1)),
+        patch("app.main.get_explainers", return_value=_explainers_factices()),
+    ):
+        creation = client.post(
+            "/predictions/ticket", json={"machine_id": 42, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH,
+        )
+        ticket_id = creation.json()["ticket_id"]
+
+        explication = client.get(f"/tickets/{ticket_id}/explication", headers=EN_TETE_AUTH)
+
+    assert explication.status_code == 200
+    corps = explication.json()
+    assert corps["facteurs_anomalie"][0]["feature"] == "a"
+    assert corps["facteurs_rul"][0]["feature"] == "b"
+
+
+def test_expliquer_ticket_necessite_authentification():
+    reponse = client.get("/tickets/quelconque/explication")
+    assert reponse.status_code == 401
 
 
 def test_cloturer_ticket_assigne_avec_succes():

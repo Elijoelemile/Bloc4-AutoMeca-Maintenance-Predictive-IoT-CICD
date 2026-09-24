@@ -26,6 +26,7 @@ import os
 import time
 import uuid
 from collections import deque
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -35,12 +36,12 @@ from pydantic import BaseModel, Field
 
 from app.criticite import DegradationCapteurError, charger_modeles, evaluer_criticite
 from app.derive import TAILLE_FENETRE, ResultatDerive, charger_reference, detecter_derive
+from app.explicabilite import ResultatExplication, construire_explainer_anomalie, construire_explainer_rul, expliquer
 from app.performance import ResultatReel, StatistiquesPerformance, calculer_performance
-
-app = FastAPI(title="AutoMeca — Service de maintenance predictive")
 
 _modeles_charges: dict | None = None
 _reference_derive: dict | None = None
+_explainers: dict | None = None
 
 
 def get_modeles() -> dict:
@@ -57,6 +58,37 @@ def get_reference_derive() -> dict:
     if _reference_derive is None:
         _reference_derive = charger_reference()
     return _reference_derive
+
+
+def get_explainers() -> dict:
+    """Construit les explainers SHAP une seule fois (paresseux) — leur
+    construction est lente (~13s pour le TreeExplainer, mesure reelle),
+    voir app/explicabilite.py."""
+    global _explainers
+    if _explainers is None:
+        modeles = get_modeles()
+        _explainers = {
+            "anomalie": construire_explainer_anomalie(modeles),
+            "rul": construire_explainer_rul(modeles),
+        }
+    return _explainers
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Prechauffage au demarrage du service (pas a la premiere requete) :
+    # sans ca, le premier technicien a consulter une explication
+    # attendrait ~13s (construction du TreeExplainer, mesure reelle en
+    # verification manuelle) — un cout invisible au demarrage du
+    # conteneur est largement preferable a une latence surprise cote
+    # utilisateur.
+    get_modeles()
+    get_reference_derive()
+    get_explainers()
+    yield
+
+
+app = FastAPI(title="AutoMeca — Service de maintenance predictive", lifespan=lifespan)
 
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key")
@@ -93,6 +125,9 @@ class TicketGMAO(BaseModel):
     statut: StatutTicket
     degrade: bool
     resultat_reel: ResultatReel | None = None
+    mesures: dict[str, float] = Field(
+        default_factory=dict, description="Conservees pour permettre l'explicabilite a posteriori (voir /tickets/{id}/explication)"
+    )
 
 
 class ClotureTicket(BaseModel):
@@ -128,6 +163,7 @@ def creer_ticket(entree: MesuresEntree, _: None = Depends(verifier_cle_api)) -> 
         criticite=resultat.criticite,
         statut=statut,
         degrade=resultat.degrade,
+        mesures=entree.mesures,
     )
     TICKETS[ticket.ticket_id] = ticket
 
@@ -152,12 +188,39 @@ def valider_ticket(ticket_id: str, _: None = Depends(verifier_cle_api)) -> Ticke
     return ticket
 
 
+@app.get("/tickets", response_model=list[TicketGMAO])
+def lister_tickets(statut: StatutTicket | None = None, _: None = Depends(verifier_cle_api)) -> list[TicketGMAO]:
+    """Liste des tickets, les plus recents en premier — sans ca,
+    l'interface de supervision devrait connaitre a l'avance chaque
+    ticket_id, ce qui n'a pas de sens pour un technicien qui doit
+    decouvrir les tickets en attente."""
+    tickets = list(TICKETS.values())
+    if statut is not None:
+        tickets = [t for t in tickets if t.statut == statut]
+    return sorted(tickets, key=lambda t: t.horodatage, reverse=True)
+
+
 @app.get("/tickets/{ticket_id}", response_model=TicketGMAO)
 def lire_ticket(ticket_id: str, _: None = Depends(verifier_cle_api)) -> TicketGMAO:
     ticket = TICKETS.get(ticket_id)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket introuvable")
     return ticket
+
+
+@app.get("/tickets/{ticket_id}/explication", response_model=ResultatExplication)
+def expliquer_ticket(ticket_id: str, _: None = Depends(verifier_cle_api)) -> ResultatExplication:
+    """Facteurs declencheurs (SHAP) — exigence "IA ethique" du sujet :
+    permet a un technicien de comprendre pourquoi l'alerte a ete levee,
+    pas seulement de la constater. Recalcule a la demande (non stocke a
+    la creation du ticket) — coute ~40ms (anomalie) a ~400ms (RUL), voir
+    app/explicabilite.py."""
+    ticket = TICKETS.get(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket introuvable")
+    modeles = get_modeles()
+    explainers = get_explainers()
+    return expliquer(modeles, explainers, ticket.mesures)
 
 
 @app.post("/tickets/{ticket_id}/cloturer", response_model=TicketGMAO)

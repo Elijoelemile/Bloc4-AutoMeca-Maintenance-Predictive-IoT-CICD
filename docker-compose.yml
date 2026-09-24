@@ -1,0 +1,26 @@
+# Lance l'API et l'interface de supervision ensemble — usage local et
+# demonstration (docker-compose up). En production, chaque service
+# serait deploye independamment sur l'infrastructure Edge/Cloud (voir
+# .github/workflows/ci.yml, job "deploiement", differe jusqu'au
+# provisionnement OVHcloud).
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-cle-demo-locale}
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+      - API_KEY=${API_KEY:-cle-demo-locale}
+    depends_on:
+      - api

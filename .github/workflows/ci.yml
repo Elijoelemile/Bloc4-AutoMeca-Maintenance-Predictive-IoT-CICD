@@ -30,7 +30,7 @@ jobs:
         run: pytest tests/test_regression_modele.py -v
 
   build-image:
-    name: Conteneurisation
+    name: Conteneurisation (API)
     needs: tests
     runs-on: ubuntu-latest
     steps:
@@ -54,9 +54,45 @@ jobs:
           curl -sf -H "X-API-Key: cle-ci" http://localhost:8000/monitoring/performance
           docker rm -f test-api
 
+  build-image-ui:
+    name: Conteneurisation (interface de supervision)
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # Pas de LFS ici : l'interface ne charge aucun modele elle-meme,
+        # elle consomme l'API par HTTP — voir ui/app.py.
+      - name: Construire l'image Docker
+        run: docker build -f ui/Dockerfile -t automeca-supervision-ui:${{ github.sha }} .
+      - name: Verifier que l'image demarre et repond
+        run: |
+          docker run -d --name test-ui -p 8501:8501 automeca-supervision-ui:${{ github.sha }}
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8501/_stcore/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8501/_stcore/health
+          docker rm -f test-ui
+
+  test-ui-reelle:
+    name: Tests fonctionnels de l'interface (vrais modeles, vraie API)
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # necessaire ici : le test demarre la vraie API avec les vrais modeles
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer les dependances (API + interface)
+        run: pip install -r requirements.txt -r ui/requirements.txt
+      - name: Tests fonctionnels (demarre la vraie API, pilote l'interface via AppTest)
+        run: pytest tests/test_ui.py -v
+
   deploiement:
     name: Deploiement (Edge/Cloud) + registre de modeles — differe
-    needs: build-image
+    needs: [build-image, build-image-ui, test-ui-reelle]
     runs-on: ubuntu-latest
     if: false
     # Desactive volontairement : l'infrastructure OVHcloud n'est pas
