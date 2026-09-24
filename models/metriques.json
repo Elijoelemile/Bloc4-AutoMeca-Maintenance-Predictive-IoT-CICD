@@ -1,22 +1,24 @@
 {
   "isolation_forest": {
     "hyperparametres": {
+      "n_estimators": 300,
       "contamination": 0.05,
-      "max_samples": 1024,
-      "n_estimators": 300
+      "max_samples": 1024
     },
     "auc_test": 0.9311659429912238,
     "auc_cv_moyen": 0.9316248967437115,
-    "auc_cv_std": 0.002944236704124865
+    "auc_cv_std": 0.002944236704124865,
+    "mlflow_run_id": "3b8accb78f2a4049a3551d498f0617b6"
   },
   "random_survival_forest": {
     "hyperparametres": {
-      "max_features": "sqrt",
+      "n_estimators": 300,
       "min_samples_leaf": 5,
-      "n_estimators": 300
+      "max_features": "sqrt"
     },
     "c_index_test": 0.7953324729818388,
     "c_index_cv_moyen": 0.7844144713625927,
-    "c_index_cv_std": 0.019306277402722255
+    "c_index_cv_std": 0.019306277402722255,
+    "mlflow_run_id": "cfcf80a69f9a49d0b943d164ed6a68f1"
   }
 }

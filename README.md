@@ -47,7 +47,7 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 ├── models/                  # copies des modeles du depot solution-IA (Git LFS, voir Prerequis)
 │   ├── isolation_forest.joblib
 │   ├── random_survival_forest.joblib
-│   ├── metriques.json              # metriques extraites (petit fichier, PAS en LFS) pour les tests de non-regression
+│   ├── metriques.json              # metriques + id du run MLflow d'origine (petit fichier, PAS en LFS) pour les tests de non-regression
 │   └── reference_distribution.json # distribution des features a l'entrainement (petit fichier, PAS en LFS) pour la derive
 ├── tests/
 │   ├── test_criticite.py       # 8 tests, modeles mockes
@@ -70,6 +70,8 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 
 > [!NOTE]
 > `models/*.joblib` est suivi via **Git LFS** (le modèle de survie seul fait 186 Mo — les forêts de survie stockent la courbe de survie complète à chaque feuille). Ce sont des **copies** des modèles produits par les notebooks du dépôt [Bloc4-...-Solution-IA](https://github.com/<user>/Bloc4-AutoMeca-Maintenance-Predictive-IoT-Solution-IA) — pas une dépendance technique entre dépôts (même principe qu'au Bloc 3), un point de passage explicite entre entraînement et déploiement. **Prérequis** : `git lfs install` avant de cloner, sinon `models/*.joblib` reste un pointeur texte au lieu du vrai fichier.
+>
+> **Git LFS n'est pas un registre de modèles** : c'est un mécanisme de stockage de gros fichiers, rien de plus — il ne sait rien des paramètres, métriques ou runs qui ont produit ce fichier. Le vrai registre de modèles (suivi de tous les essais du grid search, versions, cycle de vie) est **MLflow**, dans le dépôt solution-IA. `metriques.json` référence l'ID du run MLflow exact dont chaque modèle est issu (`mlflow_run_id`), pour la traçabilité — sans dépendance technique à MLflow depuis ce dépôt (même principe que le reste : un artefact de sortie explicite, pas un accès direct au tracking store).
 
 ## Démarrage local
 
