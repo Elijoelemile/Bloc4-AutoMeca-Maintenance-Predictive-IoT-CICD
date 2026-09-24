@@ -36,14 +36,19 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 │   └── ci.yml                 # tests -> conteneurisation -> deploiement (differe, voir README)
 ├── app/
 │   ├── criticite.py      # logique de criticite (anomalie + RUL), degradation gracieuse
-│   └── main.py             # API FastAPI : tickets GMAO, authentification, garde-fou
+│   ├── derive.py            # detection de derive (PSI), suivi statistique des variables d'entree
+│   ├── performance.py        # precision / taux de fausses alertes / latence en production
+│   └── main.py             # API FastAPI : tickets GMAO, authentification, garde-fou, monitoring
 ├── models/                  # copies des modeles du depot solution-IA (Git LFS, voir Prerequis)
 │   ├── isolation_forest.joblib
 │   ├── random_survival_forest.joblib
-│   └── metriques.json          # metriques extraites (petit fichier, PAS en LFS) pour les tests de non-regression
+│   ├── metriques.json              # metriques extraites (petit fichier, PAS en LFS) pour les tests de non-regression
+│   └── reference_distribution.json # distribution des features a l'entrainement (petit fichier, PAS en LFS) pour la derive
 ├── tests/
 │   ├── test_criticite.py       # 8 tests, modeles mockes
-│   ├── test_main.py             # 8 tests, API + garde-fou, modeles mockes
+│   ├── test_main.py             # 16 tests, API + garde-fou + monitoring, modeles mockes
+│   ├── test_derive.py            # 9 tests, detection de derive (PSI)
+│   ├── test_performance.py        # 5 tests, calcul precision/faux positifs/latence
 │   └── test_regression_modele.py # 3 tests, lit models/metriques.json (pas les .joblib)
 ├── Dockerfile                  # construit et verifie (image demarre, /sante repond)
 ├── .dockerignore
@@ -66,6 +71,8 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 
 ## Contenu
 
-- **`app/criticite.py`** — combine les deux modèles : criticité **élevée** si le modèle d'anomalie détecte une dérive (`IsolationForest.predict() == -1`, seuil intégré au modèle) **ou** si la probabilité de panne sous 7 jours dépasse 0,335 (seuil calculé sur les données de validation réelles du modèle RUL — 85ᵉ percentile, ~15 % des observations flaguées, ~38 % des vraies pannes couvertes ; voir le notebook `02_prediction_rul.ipynb` du dépôt solution-IA). **Dégradation gracieuse** : une mesure de capteur manquante est imputée et signalée (`degrade=True`), sauf si plus de 50 % des mesures manquent — dans ce cas la prédiction n'est plus fiable et une exception explicite est levée plutôt qu'un résultat silencieusement faux.
-- **`app/main.py`** — API authentifiée (`X-API-Key`) : `POST /predictions/ticket` crée un ticket GMAO (simulé — ce projet n'a pas de vrai système GMAO à intégrer) et le route selon la criticité ; `POST /tickets/{id}/valider` implémente le garde-fou de validation humaine ; `GET /sante` (sans authentification) pour le monitoring d'infrastructure.
-- **`tests/`** — 16 tests, modèles mockés. Le module a aussi été vérifié manuellement contre les vrais modèles (voir le journal de développement) : sur 200 mesures réelles issues de périodes saines, 7 % de faux positifs — cohérent avec le paramètre `contamination=0.05` du modèle d'anomalie.
+- **`app/criticite.py`** — combine les deux modèles : criticité **élevée** si le modèle d'anomalie détecte une anomalie (`IsolationForest.predict() == -1`, seuil intégré au modèle) **ou** si la probabilité de panne sous 7 jours dépasse 0,335 (seuil calculé sur les données de validation réelles du modèle RUL — 85ᵉ percentile, ~15 % des observations flaguées, ~38 % des vraies pannes couvertes ; voir le notebook `02_prediction_rul.ipynb` du dépôt solution-IA). **Dégradation gracieuse** : une mesure de capteur manquante est imputée et signalée (`degrade=True`), sauf si plus de 50 % des mesures manquent — dans ce cas la prédiction n'est plus fiable et une exception explicite est levée plutôt qu'un résultat silencieusement faux.
+- **`app/derive.py`** — détection de dérive (*data drift*, exigence explicite du sujet) : compare la distribution des variables reçues (fenêtre glissante des 200 dernières requêtes) à leur distribution réelle au moment de l'entraînement (`models/reference_distribution.json`, généré depuis les mêmes données et le même code que les notebooks du dépôt solution-IA). Indicateur : **PSI** (Population Stability Index), standard MLOps — deciles de référence pour les variables continues (capteurs), proportions exactes par valeur pour les variables à faible cardinalité (indicatrices de modèle, `nb_erreurs_7j`). Cette distinction a été ajoutée après une vérification manuelle contre le service réel : les déciles seuls arrondissaient une proportion réelle de 14,76 % à 10 %/20 %, gonflant artificiellement le PSI sur des indicatrices de modèle pourtant non dérivées (voir le module `app/derive.py` pour le détail). Une dérive confirmée ne déclenche pas de réentraînement automatique (jeu d'entraînement de plusieurs Go, hors de portée d'une CI gratuite) mais un signal explicite (`GET /monitoring/derive`) à destination de l'équipe data, qui relance alors les notebooks versionnés et déterministes (`random_state=42`) du dépôt solution-IA — reproductibilité satisfaite sans orchestrateur dédié pour un réentraînement occasionnel.
+- **`app/performance.py`** — précision et taux de fausses alertes **mesurés en production** (pas l'AUC/C-index hors ligne des notebooks) : à partir des tickets clôturés par un technicien avec un résultat réel (`POST /tickets/{id}/cloturer`), plus la latence moyenne du service. Mesure volontairement différente d'un taux de faux positifs classique : en conditions réelles, seuls les tickets effectivement créés sont observables, jamais les vrais négatifs.
+- **`app/main.py`** — API authentifiée (`X-API-Key`) : `POST /predictions/ticket` crée un ticket GMAO (simulé — ce projet n'a pas de vrai système GMAO à intégrer) et le route selon la criticité ; `POST /tickets/{id}/valider` implémente le garde-fou de validation humaine ; `POST /tickets/{id}/cloturer` enregistre le résultat réel (panne confirmée / fausse alerte) ; `GET /monitoring/derive` et `GET /monitoring/performance` exposent le suivi de dérive et de performance ; `GET /sante` (sans authentification) pour le monitoring d'infrastructure.
+- **`tests/`** — 41 tests, modèles/référence mockés. Vérifié aussi manuellement contre le service réel (voir le journal de développement) : sur 200 mesures réelles issues de périodes saines, 7 % de faux positifs de criticité (cohérent avec `contamination=0.05`) ; injection contrôlée d'une dérive réelle sur `vibration_*` (×5) correctement détectée (PSI ≈ 8, très au-dessus du seuil) pendant que les variables non affectées restent stables.
