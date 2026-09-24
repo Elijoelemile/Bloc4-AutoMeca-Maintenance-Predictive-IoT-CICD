@@ -58,7 +58,7 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 │   ├── test_ui.py                  # 3 tests fonctionnels : vraie API + vrais modeles, interface pilotee via AppTest
 │   └── test_regression_modele.py # 3 tests, lit models/metriques.json (pas les .joblib)
 ├── Dockerfile                  # API — construit et verifie (image demarre, /sante repond)
-├── docker-compose.yml           # lance API + interface ensemble (local/demo)
+├── docker-compose.yml           # lance API + interface ensemble — local ET cible reelle de deploiement
 ├── CONFORMITE.md                # RGPD, ISO 27001, IA ethique, accessibilite — voir sujet Bloc 4
 ├── .dockerignore
 ├── .env.example
@@ -72,6 +72,9 @@ Bloc4-AutoMeca-Maintenance-Predictive-IoT-CICD/
 > `models/*.joblib` est suivi via **Git LFS** (le modèle de survie seul fait 186 Mo — les forêts de survie stockent la courbe de survie complète à chaque feuille). Ce sont des **copies** des modèles produits par les notebooks du dépôt [Bloc4-...-Solution-IA](https://github.com/<user>/Bloc4-AutoMeca-Maintenance-Predictive-IoT-Solution-IA) — pas une dépendance technique entre dépôts (même principe qu'au Bloc 3), un point de passage explicite entre entraînement et déploiement. **Prérequis** : `git lfs install` avant de cloner, sinon `models/*.joblib` reste un pointeur texte au lieu du vrai fichier.
 >
 > **Git LFS n'est pas un registre de modèles** : c'est un mécanisme de stockage de gros fichiers, rien de plus — il ne sait rien des paramètres, métriques ou runs qui ont produit ce fichier. Le vrai registre de modèles (suivi de tous les essais du grid search, versions, cycle de vie) est **MLflow**, dans le dépôt solution-IA. `metriques.json` référence l'ID du run MLflow exact dont chaque modèle est issu (`mlflow_run_id`), pour la traçabilité — sans dépendance technique à MLflow depuis ce dépôt (même principe que le reste : un artefact de sortie explicite, pas un accès direct au tracking store).
+
+> [!NOTE]
+> **Déploiement : ni registre de conteneurs, ni Kubernetes.** L'API et l'interface (2 conteneurs) tournent sur une **seule petite instance Compute OVHcloud**, partagée avec Kafka et ClickHouse auto-hébergés du dépôt Bloc 3 — construits directement sur l'instance (`git pull` + `docker compose build`), pas poussés vers un registre. Kubernetes aurait un control plane gratuit chez OVHcloud, mais nécessiterait quand même un nœud worker payant pour une complexité d'orchestration inutile à cette échelle (2 conteneurs, pas de montée en charge à gérer). Raisonnement complet et tarifs réels (Kafka managé ~139 $/nœud ×3, ClickHouse managé ~213 $/nœud, face au crédit d'essai Public Cloud de 200 € / 1 mois) dans le README du dépôt Bloc 2, section *"Contraintes de coût et choix d'infrastructure OVHcloud"*.
 
 ## Démarrage local
 

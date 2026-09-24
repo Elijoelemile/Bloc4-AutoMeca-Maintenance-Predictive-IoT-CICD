@@ -91,7 +91,7 @@ jobs:
         run: pytest tests/test_ui.py -v
 
   deploiement:
-    name: Deploiement (Edge/Cloud) + registre de modeles — differe
+    name: Deploiement (instance Compute OVHcloud partagee) — differe
     needs: [build-image, build-image-ui, test-ui-reelle]
     runs-on: ubuntu-latest
     if: false
@@ -99,9 +99,31 @@ jobs:
     # encore provisionnee (decision prise en cours de projet — voir
     # memoire de decision : provisionner une fois tous les blocs prets,
     # pas au fil de l'eau, pour eviter de payer une infra qui tourne a
-    # vide pendant le developpement). A activer avec les vraies
-    # informations de connexion au registre de conteneurs et a
-    # l'infrastructure de deploiement, sans changer la structure du
-    # pipeline ci-dessus.
+    # vide pendant le developpement).
+    #
+    # Pas de registre de conteneurs, pas de Kubernetes : 2 conteneurs
+    # sur une seule petite instance Compute ne justifient ni le cout ni
+    # la complexite de l'un ou l'autre (voir README du Bloc 2, section
+    # "Contraintes de cout et choix d'infrastructure OVHcloud" — Kafka
+    # managE ~139 $/noeud x3, ClickHouse managE ~213 $/noeud, face a un
+    # credit d'essai unique de 200 EUR / 1 mois). L'image est construite
+    # directement SUR l'instance de deploiement (meme mecanisme qu'en
+    # local, voir docker-compose.yml), pas poussee vers un registre puis
+    # tiree ailleurs — cette instance est aussi celle qui heberge Kafka
+    # et ClickHouse auto-heberges du Bloc 3.
+    #
+    # A activer avec un secret SSH (cle privee + hote) pointant vers
+    # cette instance, une fois provisionnee :
+    #   - name: Deployer (git pull + rebuild + restart, sur l'instance)
+    #     uses: appleboy/ssh-action@v1
+    #     with:
+    #       host: ${{ secrets.DEPLOY_HOST }}
+    #       username: ${{ secrets.DEPLOY_USER }}
+    #       key: ${{ secrets.DEPLOY_SSH_KEY }}
+    #       script: |
+    #         cd /opt/automeca-cicd
+    #         git pull
+    #         docker compose build
+    #         docker compose up -d
     steps:
-      - run: echo "Deploiement reel a activer une fois l'infrastructure OVHcloud provisionnee (push de l'image vers un registre, deploiement, versionnement des modeles)."
+      - run: echo "Deploiement reel a activer une fois l'instance Compute OVHcloud provisionnee (git pull + docker compose build/up directement sur l'instance, voir commentaires ci-dessus)."
