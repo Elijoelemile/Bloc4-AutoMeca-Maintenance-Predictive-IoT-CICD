@@ -9,6 +9,13 @@ COPY app/ ./app/
 COPY models/ ./models/
 
 RUN useradd --create-home appuser
+# /data recoit le volume Docker de persistance des tickets (voir
+# docker-compose.yml, app/main.py) — cree et donne a appuser AVANT le
+# montage du volume : Docker copie les permissions de ce repertoire
+# dans le volume a sa creation, sinon appuser (non-root, ci-dessous)
+# n'a pas le droit d'ecrire dedans (PermissionError constatee en
+# deploiement reel sur Scaleway avant cette correction).
+RUN mkdir -p /data && chown appuser:appuser /data
 USER appuser
 
 EXPOSE 8000
