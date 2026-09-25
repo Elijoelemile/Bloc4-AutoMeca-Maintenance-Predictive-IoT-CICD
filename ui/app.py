@@ -101,10 +101,6 @@ def onglet_tickets(url_base: str, cle_api: str) -> None:
                 options=["Tous", "en_attente_validation_technicien_senior", "assigne_equipe_maintenance", "cloture"],
                 format_func=lambda s: "Tous les tickets" if s == "Tous" else STATUT_LABELS[s],
             )
-        st.caption(
-            "En production, les tickets apparaissent automatiquement (créés par le pipeline de données, "
-            "Bloc 3) — actualisez pour voir les plus récents."
-        )
     params = {} if filtre == "Tous" else {"statut": filtre}
     tickets = _appel_api("GET", url_base, cle_api, "/tickets", params=params)
     if tickets is None:
@@ -272,7 +268,6 @@ def onglet_monitoring(url_base: str, cle_api: str) -> None:
 
 def onglet_a_propos() -> None:
     st.subheader("À propos de ce service")
-    st.write("Cette interface consomme l'API de prédiction de maintenance décrite dans ce dépôt.")
 
     principes = [
         (
