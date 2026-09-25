@@ -5,12 +5,17 @@ l'authentification et le garde-fou de validation humaine, pas les
 predictions elles-memes.
 """
 import os
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 os.environ["API_KEY"] = "cle-de-test"
+# Chemin de persistance isole du repertoire du projet — sans ca, chaque
+# execution des tests ecrirait dans data/tickets.json du depot (CHEMIN_
+# PERSISTANCE est lu au chargement du module, avant tout fixture).
+os.environ["TICKETS_PERSISTANCE_PATH"] = os.path.join(tempfile.gettempdir(), "test_tickets_automeca.json")
 
 from app.main import FENETRE_MESURES, LATENCES_MS, TICKETS, app  # noqa: E402
 
@@ -272,8 +277,29 @@ def test_monitoring_performance_apres_clotures():
     reponse = client.get("/monitoring/performance", headers=EN_TETE_AUTH)
     corps = reponse.json()
     assert corps["n_tickets_clotures"] == 3
+    assert corps["n_pannes_confirmees"] == 3
+    assert corps["n_fausses_alertes"] == 0
     assert corps["precision"] == 1.0
     assert corps["latence_moyenne_ms"] is not None
+
+
+def test_ticket_persiste_sur_disque_et_recharge_au_demarrage():
+    """Le coeur de la persistance : un ticket cree doit survivre a un
+    "redemarrage" simule (TICKETS vide + rechargement depuis le fichier
+    de CHEMIN_PERSISTANCE), pas seulement rester en memoire."""
+    from app.main import _charger_tickets
+
+    with patch("app.main.get_modeles", return_value=_modeles_factices(anomalie_predite=1, proba_panne=0.1)):
+        creation = client.post(
+            "/predictions/ticket", json={"machine_id": 7, "mesures": {"a": 1, "b": 2}}, headers=EN_TETE_AUTH,
+        )
+    ticket_id = creation.json()["ticket_id"]
+
+    TICKETS.clear()  # simule le redemarrage du conteneur (perte de l'etat memoire)
+    _charger_tickets()
+
+    assert ticket_id in TICKETS
+    assert TICKETS[ticket_id].machine_id == 7
 
 
 def test_monitoring_derive_necessite_authentification():

@@ -19,6 +19,13 @@ services:
       - "8000:8000"
     environment:
       - API_KEY=${API_KEY:-cle-demo-locale}
+      - TICKETS_PERSISTANCE_PATH=/data/tickets.json
+    volumes:
+      # Historique des tickets GMAO persiste entre deux redemarrages du
+      # conteneur (voir app/main.py, CHEMIN_PERSISTANCE) — un volume
+      # nomme, pas un bind mount, pour rester portable entre poste local
+      # et instance de production.
+      - tickets-gmao:/data
 
   ui:
     build:
@@ -31,3 +38,6 @@ services:
       - API_KEY=${API_KEY:-cle-demo-locale}
     depends_on:
       - api
+
+volumes:
+  tickets-gmao:

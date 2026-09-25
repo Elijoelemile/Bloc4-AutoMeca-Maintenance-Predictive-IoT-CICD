@@ -26,10 +26,13 @@ Le registre de traitement RGPD et l'AIPD eux-mêmes sont des livrables du **Bloc
 données) — ce dépôt ne les duplique pas, il s'y conforme : aucune donnée personnelle n'est introduite ici
 qui nécessiterait une entrée supplémentaire dans ce registre.
 
-**Minimisation et conservation** : la GMAO simulée (`TICKETS`, dict en mémoire) ne conserve que
-l'identifiant machine, l'horodatage et le résultat de calcul — jamais l'identité de qui a saisi une
-mesure ou validé un ticket. Rien n'est persisté au-delà du cycle de vie du processus (voir le
-`[!NOTE]` du README sur le caractère simulé de cette GMAO).
+**Minimisation et conservation** : la GMAO simulée (`TICKETS`, persisté dans un fichier JSON sur un
+volume Docker — voir `app/main.py`, `CHEMIN_PERSISTANCE`) ne conserve que l'identifiant machine,
+l'horodatage et le résultat de calcul — jamais l'identité de qui a saisi une mesure ou validé un
+ticket. La persistance survit à un redémarrage du conteneur (nécessaire pour un historique
+d'exploitation exploitable par un technicien), mais reste locale à l'instance et sans durée de
+conservation définie — un vrai système GMAO y substituerait une politique de purge conforme au
+registre de traitement du Bloc 1 (voir le `[!NOTE]` du README sur le caractère simulé de cette GMAO).
 
 ## 2. ISO 27001
 

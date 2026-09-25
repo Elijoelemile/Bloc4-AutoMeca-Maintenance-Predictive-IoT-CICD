@@ -271,6 +271,12 @@ def onglet_nouvelle_alerte(url_base: str, cle_api: str) -> None:
 def onglet_monitoring(url_base: str, cle_api: str) -> None:
     st.subheader("Suivi de dérive et de performance")
 
+    with st.container(border=True):
+        # Meme principe que le bouton "Actualiser la liste" de l'onglet
+        # Tickets : force une nouvelle execution du script, qui refait
+        # les appels /monitoring/* ci-dessous.
+        st.button("Actualiser", icon="🔄", key="actualiser_monitoring")
+
     derive = _appel_api("GET", url_base, cle_api, "/monitoring/derive")
     if derive is not None:
         with st.container(border=True):
@@ -302,6 +308,34 @@ def onglet_monitoring(url_base: str, cle_api: str) -> None:
                 "Latence moyenne du service",
                 f"{performance['latence_moyenne_ms']:.0f} ms" if performance["latence_moyenne_ms"] is not None else "—",
             )
+
+            if performance["n_tickets_clotures"] > 0:
+                st.caption("Répartition des tickets clôturés, derrière les taux ci-dessus :")
+                df_repartition = pd.DataFrame(
+                    {"Tickets": [performance["n_pannes_confirmees"], performance["n_fausses_alertes"]]},
+                    index=["Pannes confirmées", "Fausses alertes"],
+                )
+                st.bar_chart(df_repartition, color="#2E7D32")
+
+        tickets_clotures = _appel_api("GET", url_base, cle_api, "/tickets", params={"statut": "cloture"})
+        if tickets_clotures:
+            with st.container(border=True):
+                st.markdown("#### 🗂️ Journal des tickets clôturés")
+                df_clotures = pd.DataFrame(tickets_clotures)[
+                    ["machine_id", "criticite", "proba_panne_7j", "resultat_reel", "horodatage"]
+                ].rename(columns={
+                    "machine_id": "Machine",
+                    "criticite": "Criticité",
+                    "proba_panne_7j": "Probabilité de panne (7j)",
+                    "resultat_reel": "Résultat réel",
+                    "horodatage": "Horodatage",
+                })
+                df_clotures["Criticité"] = df_clotures["Criticité"].map(lambda c: CRITICITE_LABELS.get(c, c))
+                df_clotures["Résultat réel"] = df_clotures["Résultat réel"].map(
+                    lambda r: "Panne confirmée" if r == "panne_confirmee" else "Fausse alerte"
+                )
+                df_clotures["Probabilité de panne (7j)"] = df_clotures["Probabilité de panne (7j)"].map(lambda p: f"{p:.1%}")
+                st.dataframe(df_clotures, hide_index=True, use_container_width=True)
 
 
 def main() -> None:

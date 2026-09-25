@@ -128,6 +128,12 @@ def test_workflow_complet_criticite_elevee(api_reelle, mesures_reelles):
     assert metriques["Tickets clôturés"] == "1"
     assert metriques["Précision"] == "100%"
 
+    tab_monitoring = at.tabs[2]
+    assert any(b.label == "Actualiser" for b in tab_monitoring.button)
+    journal = tab_monitoring.dataframe[-1].value  # dernier dataframe affiche = journal des clotures
+    assert journal["Résultat réel"].iloc[0] == "Panne confirmée"
+    assert journal["Machine"].iloc[0] == 2
+
 
 def test_explication_shap_sans_erreur(api_reelle, mesures_reelles):
     at = _app_test(api_reelle)

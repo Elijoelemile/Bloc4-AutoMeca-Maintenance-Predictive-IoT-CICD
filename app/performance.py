@@ -25,6 +25,8 @@ class ResultatReel(str, Enum):
 @dataclass(frozen=True)
 class StatistiquesPerformance:
     n_tickets_clotures: int
+    n_pannes_confirmees: int
+    n_fausses_alertes: int
     precision: float | None
     taux_fausses_alertes: float | None
     n_latences_mesurees: int
@@ -33,16 +35,19 @@ class StatistiquesPerformance:
 
 def calculer_performance(resultats_reels: list[ResultatReel], latences_ms: list[float]) -> StatistiquesPerformance:
     n = len(resultats_reels)
+    vrais_positifs = sum(1 for r in resultats_reels if r == ResultatReel.PANNE_CONFIRMEE)
+    fausses_alertes = n - vrais_positifs
     if n == 0:
         precision = None
         taux_fausses_alertes = None
     else:
-        vrais_positifs = sum(1 for r in resultats_reels if r == ResultatReel.PANNE_CONFIRMEE)
         precision = vrais_positifs / n
         taux_fausses_alertes = 1 - precision
 
     return StatistiquesPerformance(
         n_tickets_clotures=n,
+        n_pannes_confirmees=vrais_positifs,
+        n_fausses_alertes=fausses_alertes,
         precision=precision,
         taux_fausses_alertes=taux_fausses_alertes,
         n_latences_mesurees=len(latences_ms),

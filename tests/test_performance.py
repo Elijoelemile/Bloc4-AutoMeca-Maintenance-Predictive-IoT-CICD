@@ -14,6 +14,8 @@ def test_precision_et_taux_fausses_alertes():
     resultats = [ResultatReel.PANNE_CONFIRMEE] * 3 + [ResultatReel.FAUSSE_ALERTE] * 1
     stats = calculer_performance(resultats, [])
     assert stats.n_tickets_clotures == 4
+    assert stats.n_pannes_confirmees == 3
+    assert stats.n_fausses_alertes == 1
     assert stats.precision == 0.75
     assert stats.taux_fausses_alertes == 0.25
 

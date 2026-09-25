@@ -13,15 +13,21 @@ et le routage du ticket, jamais la decision operationnelle qui en
 decoule.
 
 GMAO simulee : ce projet n'a pas de vrai systeme GMAO a integrer — les
-tickets sont stockes en memoire, avec la meme structure (statut,
-criticite, horodatage) qu'une vraie integration API GMAO utiliserait.
+tickets sont stockes dans un fichier JSON (voir CHEMIN_PERSISTANCE),
+avec la meme structure (statut, criticite, horodatage) qu'une vraie
+integration API GMAO utiliserait. Persistance volontairement minimale
+(un fichier, pas une base de donnees) : l'objectif est de survivre a un
+redemarrage du conteneur, pas de servir plusieurs instances en
+parallele — une vraie mise en production remplacerait ce fichier par la
+base de donnees GMAO cible, sans changer la logique metier.
 
 Derive et performance (voir app/derive.py, app/performance.py) : la
-fenetre glissante des mesures recues et les latences mesurees sont
-elles aussi en memoire, coherent avec la simulation GMAO ci-dessus —
-une vraie mise en production remplacerait TICKETS/FENETRE_MESURES/
-LATENCES_MS par un stockage persistant, sans changer la logique.
+fenetre glissante des mesures recues et les latences mesurees restent
+en memoire (FENETRE_MESURES/LATENCES_MS) — leur perte au redemarrage
+est sans consequence (elles se reconstituent au fil des requetes
+suivantes), contrairement a l'historique des tickets.
 """
+import json
 import os
 import time
 import uuid
@@ -29,6 +35,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -85,6 +92,7 @@ async def lifespan(app: FastAPI):
     get_modeles()
     get_reference_derive()
     get_explainers()
+    _charger_tickets()
     yield
 
 
@@ -142,6 +150,35 @@ TICKETS: dict[str, TicketGMAO] = {}
 FENETRE_MESURES: deque[dict[str, float]] = deque(maxlen=TAILLE_FENETRE)
 LATENCES_MS: deque[float] = deque(maxlen=TAILLE_FENETRE)
 
+# Persistance de l'historique des tickets (voir docstring du module) —
+# chemin par defaut adapte au developpement local ; en production, le
+# volume Docker monte sur /data rend ce fichier persistant entre deux
+# redemarrages du conteneur (voir docker-compose.yml).
+CHEMIN_PERSISTANCE = Path(os.environ.get("TICKETS_PERSISTANCE_PATH", "data/tickets.json"))
+
+
+def _charger_tickets() -> None:
+    """Recharge l'historique des tickets depuis le disque au demarrage
+    du service — sans cela, chaque redemarrage de conteneur effacerait
+    l'historique GMAO, ce qui n'aurait pas de sens pour un systeme cense
+    en simuler un vrai."""
+    if not CHEMIN_PERSISTANCE.exists():
+        return
+    donnees = json.loads(CHEMIN_PERSISTANCE.read_text(encoding="utf-8"))
+    for ticket_id, ticket_dict in donnees.items():
+        TICKETS[ticket_id] = TicketGMAO(**ticket_dict)
+
+
+def _sauvegarder_tickets() -> None:
+    """Ecrit l'integralite de TICKETS sur disque — appele apres chaque
+    creation/modification. Volume de tickets attendu (dizaines a
+    quelques centaines pour une demonstration) : reecrire le fichier en
+    entier a chaque fois reste largement suffisant, pas besoin d'un
+    format d'ajout incremental."""
+    CHEMIN_PERSISTANCE.parent.mkdir(parents=True, exist_ok=True)
+    donnees = {ticket_id: json.loads(ticket.model_dump_json()) for ticket_id, ticket in TICKETS.items()}
+    CHEMIN_PERSISTANCE.write_text(json.dumps(donnees, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 @app.post("/predictions/ticket", response_model=TicketGMAO)
 def creer_ticket(entree: MesuresEntree, _: None = Depends(verifier_cle_api)) -> TicketGMAO:
@@ -166,6 +203,7 @@ def creer_ticket(entree: MesuresEntree, _: None = Depends(verifier_cle_api)) -> 
         mesures=entree.mesures,
     )
     TICKETS[ticket.ticket_id] = ticket
+    _sauvegarder_tickets()
 
     FENETRE_MESURES.append(entree.mesures)
     LATENCES_MS.append((time.perf_counter() - debut) * 1000)
@@ -185,6 +223,7 @@ def valider_ticket(ticket_id: str, _: None = Depends(verifier_cle_api)) -> Ticke
         raise HTTPException(status_code=409, detail="Ce ticket ne necessite pas de validation")
     ticket.statut = StatutTicket.ASSIGNE
     TICKETS[ticket_id] = ticket
+    _sauvegarder_tickets()
     return ticket
 
 
@@ -236,6 +275,7 @@ def cloturer_ticket(ticket_id: str, cloture: ClotureTicket, _: None = Depends(ve
     ticket.statut = StatutTicket.CLOTURE
     ticket.resultat_reel = cloture.resultat_reel
     TICKETS[ticket_id] = ticket
+    _sauvegarder_tickets()
     return ticket
 
 
