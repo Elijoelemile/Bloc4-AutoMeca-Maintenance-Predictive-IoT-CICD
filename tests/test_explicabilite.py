@@ -1,6 +1,6 @@
 """Tests unitaires — app/explicabilite.py
 
-Explainers mockes (la construction reelle d'un TreeExplainer/
+Explainers simules (la construction reelle d'un TreeExplainer/
 KernelExplainer est lente et deja verifiee manuellement contre le
 service reel — voir le journal de developpement : ~13s de construction
 en premier appel, ~40-400ms une fois mis en cache, d'ou le

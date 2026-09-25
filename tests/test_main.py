@@ -1,6 +1,6 @@
 """Tests unitaires — app/main.py
 
-Modeles mockes (voir test_criticite.py) : on teste ici le routage HTTP,
+Modeles simules (voir test_criticite.py) : on teste ici le routage HTTP,
 l'authentification et le garde-fou de validation humaine, pas les
 predictions elles-memes.
 """

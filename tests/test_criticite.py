@@ -1,6 +1,6 @@
 """Tests unitaires — app/criticite.py
 
-Modeles mockes (pas de dependance aux vrais fichiers .joblib, deja
+Modeles simules (pas de dependance aux vrais fichiers .joblib, deja
 verifies manuellement contre les vrais modeles — voir le journal de
 developpement). On teste ici la logique de routage, la degradation
 gracieuse et le garde-fou de fiabilite.

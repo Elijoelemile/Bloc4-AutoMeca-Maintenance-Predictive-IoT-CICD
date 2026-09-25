@@ -1,13 +1,13 @@
 """Tests fonctionnels — interface de supervision (ui/app.py) contre le
-vrai service API (vrais modeles, vraie reference de derive) — pas de
-mock. Necessite les vrais fichiers models/*.joblib (Git LFS) : tourne
+vrai service API (vrais modeles, vraie reference de derive) — rien de
+simule. Necessite les vrais fichiers models/*.joblib (Git LFS) : tourne
 dans une job CI dediee avec checkout LFS, pas dans la job "tests"
-(volontairement legere, modeles mockes — voir test_main.py).
+(volontairement legere, modeles simules — voir test_main.py).
 
 Utilise `AppTest` (streamlit.testing.v1), le framework de test officiel
 de Streamlit : execute reellement le script ui/app.py (pas une
 simulation), ce qui a permis de trouver deux bugs reels invisibles a
-des tests unitaires mockes, corriges en developpement :
+des tests unitaires simules, corriges en developpement :
 1. Un ticket nouvellement cree n'apparaissait pas dans l'onglet
    "Tickets" sans action supplementaire (l'onglet Tickets s'execute
    avant l'onglet Nouvelle alerte dans le script — la liste etait donc
