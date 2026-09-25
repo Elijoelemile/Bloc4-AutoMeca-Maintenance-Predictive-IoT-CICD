@@ -34,6 +34,40 @@ STATUT_LABELS = {
     "cloture": "⚪ Clôturé",
 }
 
+# Noms de colonnes techniques (voir Bloc 2, data_dictionary/dictionnaire_donnees.md
+# pour les libelles source "Tension mesuree" / "Vitesse de rotation" / "Pression" /
+# "Vibration" — aucune unite precise n'y est documentee, le dataset source
+# n'en fournit pas non plus, donc aucune n'est inventee ici) -> libelle lisible
+# pour un technicien qui ne connait pas les noms de colonnes en base.
+VARIABLE_LABELS = {
+    "volt_moy24h": "Tension moyenne (24 h)",
+    "rotate_moy24h": "Vitesse de rotation moyenne (24 h)",
+    "pressure_moy24h": "Pression moyenne (24 h)",
+    "vibration_moy24h": "Vibration moyenne (24 h)",
+    "volt_std24h": "Tension — variabilité (24 h)",
+    "rotate_std24h": "Vitesse de rotation — variabilité (24 h)",
+    "pressure_std24h": "Pression — variabilité (24 h)",
+    "vibration_std24h": "Vibration — variabilité (24 h)",
+    "volt_moy7j": "Tension moyenne (7 jours)",
+    "rotate_moy7j": "Vitesse de rotation moyenne (7 jours)",
+    "pressure_moy7j": "Pression moyenne (7 jours)",
+    "vibration_moy7j": "Vibration moyenne (7 jours)",
+    "volt_std7j": "Tension — variabilité (7 jours)",
+    "rotate_std7j": "Vitesse de rotation — variabilité (7 jours)",
+    "pressure_std7j": "Pression — variabilité (7 jours)",
+    "vibration_std7j": "Vibration — variabilité (7 jours)",
+    "nb_erreurs_7j": "Nombre d'erreurs machine (7 jours)",
+    "age": "Âge de la machine",
+    "model_model1": "Modèle de machine — type 1",
+    "model_model2": "Modèle de machine — type 2",
+    "model_model3": "Modèle de machine — type 3",
+    "model_model4": "Modèle de machine — type 4",
+}
+
+
+def _libelle_variable(nom: str) -> str:
+    return VARIABLE_LABELS.get(nom, nom)
+
 
 def _config_api() -> tuple[str, str]:
     """Lit la config depuis les variables d'environnement (injectees par
@@ -78,6 +112,7 @@ def _afficher_facteurs(titre: str, facteurs: list[dict]) -> None:
     df = pd.DataFrame(facteurs).rename(
         columns={"feature": "Variable", "valeur": "Valeur mesurée", "contribution_shap": "Contribution SHAP"}
     )
+    df["Variable"] = df["Variable"].map(_libelle_variable)
     # Table texte en premier (source d'information de reference,
     # accessible) puis graphique en complement visuel.
     st.dataframe(df, hide_index=True, use_container_width=True)
@@ -158,8 +193,9 @@ def _afficher_detail_ticket(url_base: str, cle_api: str, ticket_id: str) -> None
                 _afficher_facteurs("Modèle de durée de vie résiduelle (RUL)", explication["facteurs_rul"])
 
     with st.expander("📊 Mesures brutes envoyées par les capteurs"):
+        mesures_lisibles = [(_libelle_variable(k), v) for k, v in ticket["mesures"].items()]
         st.dataframe(
-            pd.DataFrame(list(ticket["mesures"].items()), columns=["Variable", "Valeur"]),
+            pd.DataFrame(mesures_lisibles, columns=["Variable", "Valeur"]),
             hide_index=True, use_container_width=True,
         )
 
@@ -245,7 +281,9 @@ def onglet_monitoring(url_base: str, cle_api: str) -> None:
                 st.write(f"{icones_modele[nom_modele]} **{libelle}** — {resultat['n_observations']} observations dans la fenêtre glissante")
                 if resultat["derive_confirmee"]:
                     st.error("Dérive significative détectée — réentraînement recommandé.", icon="🚨")
-                    st.dataframe(pd.DataFrame(resultat["features_en_derive"]), hide_index=True, use_container_width=True)
+                    df_derive = pd.DataFrame(resultat["features_en_derive"]).rename(columns={"feature": "Variable", "psi": "PSI"})
+                    df_derive["Variable"] = df_derive["Variable"].map(_libelle_variable)
+                    st.dataframe(df_derive, hide_index=True, use_container_width=True)
                 else:
                     st.success("Aucune dérive significative détectée.", icon="✅")
 
