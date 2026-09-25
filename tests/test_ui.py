@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -34,7 +35,17 @@ CLE_API = "cle-test-ui"
 
 @pytest.fixture(scope="module")
 def api_reelle():
-    env = {**os.environ, "API_KEY": CLE_API}
+    # Chemin de persistance isole et unique par execution du module de
+    # test — sans ca, la fixture reutilise le chemin par defaut
+    # (data/tickets.json du depot) et chaque nouvelle execution de la
+    # suite reprend les tickets crees par la precedente (persistance
+    # reelle desormais, voir app/main.py), faussant les assertions sur
+    # le nombre de tickets clotures.
+    env = {
+        **os.environ,
+        "API_KEY": CLE_API,
+        "TICKETS_PERSISTANCE_PATH": os.path.join(tempfile.mkdtemp(), "tickets.json"),
+    }
     processus = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(PORT_TEST)],
         cwd=RACINE, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

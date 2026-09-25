@@ -20,6 +20,7 @@ Choix d'accessibilite (voir aussi CONFORMITE.md) :
   d'ecran, on ne s'appuie donc pas sur eux pour l'information critique.
 """
 import os
+from datetime import datetime
 
 import pandas as pd
 import requests
@@ -67,6 +68,23 @@ VARIABLE_LABELS = {
 
 def _libelle_variable(nom: str) -> str:
     return VARIABLE_LABELS.get(nom, nom)
+
+
+def _bouton_actualiser(libelle: str, cle_horodatage: str, **kwargs) -> None:
+    """Bouton d'actualisation manuelle + preuve visuelle de son effet.
+
+    Un bouton Streamlit sans horodatage n'a aucun retour visible quand
+    les donnees recuperees sont identiques a l'affichage precedent (cas
+    frequent) — un technicien ne peut alors pas distinguer "le bouton
+    n'a rien fait" de "rien n'a change cote serveur". L'horodatage,
+    mis a jour uniquement au clic (pas a chaque rerun Streamlit,
+    declenche par n'importe quel widget), rend l'action du bouton
+    verifiable independamment du contenu affiche.
+    """
+    st.session_state.setdefault(cle_horodatage, datetime.now())
+    if st.button(libelle, icon="🔄", **kwargs):
+        st.session_state[cle_horodatage] = datetime.now()
+    st.caption(f"Dernière actualisation : {st.session_state[cle_horodatage]:%H:%M:%S}")
 
 
 def _config_api() -> tuple[str, str]:
@@ -129,7 +147,7 @@ def onglet_tickets(url_base: str, cle_api: str) -> None:
             # est de provoquer une nouvelle execution du script
             # (comportement natif de tout bouton Streamlit), qui refait
             # l'appel /tickets ci-dessous.
-            st.button("Actualiser la liste", icon="🔄")
+            _bouton_actualiser("Actualiser la liste", "derniere_actualisation_tickets")
         with col_filtre:
             filtre = st.selectbox(
                 "Filtrer par statut",
@@ -275,7 +293,7 @@ def onglet_monitoring(url_base: str, cle_api: str) -> None:
         # Meme principe que le bouton "Actualiser la liste" de l'onglet
         # Tickets : force une nouvelle execution du script, qui refait
         # les appels /monitoring/* ci-dessous.
-        st.button("Actualiser", icon="🔄", key="actualiser_monitoring")
+        _bouton_actualiser("Actualiser", "derniere_actualisation_monitoring", key="actualiser_monitoring")
 
     derive = _appel_api("GET", url_base, cle_api, "/monitoring/derive")
     if derive is not None:
