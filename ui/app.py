@@ -36,14 +36,15 @@ STATUT_LABELS = {
 
 
 def _config_api() -> tuple[str, str]:
-    st.sidebar.header("Connexion à l'API")
-    url = st.sidebar.text_input(
-        "URL de l'API", value=os.environ.get("API_URL", "http://localhost:8000"),
-        help="Adresse du service FastAPI (app/main.py) de ce même dépôt.", key="url_api",
-    )
-    cle = st.sidebar.text_input(
-        "Clé API (en-tête X-API-Key)", value=os.environ.get("API_KEY", ""), type="password", key="cle_api",
-    )
+    """Lit la config depuis les variables d'environnement (injectees par
+    docker-compose.yml, voir README) — jamais un champ visible par le
+    technicien : ni l'URL ni la cle API n'ont a etre connues ou saisies
+    par la personne qui utilise cette interface au quotidien. Exposer
+    la cle dans un champ d'UI (meme masque) la rendrait lisible en un
+    clic par n'importe quel utilisateur authentifie, ce qui contredit
+    le principe "pas de secret en dur" (voir CONFORMITE.md)."""
+    url = os.environ.get("API_URL", "http://localhost:8000")
+    cle = os.environ.get("API_KEY", "")
     return url.rstrip("/"), cle
 
 
@@ -198,10 +199,6 @@ def onglet_nouvelle_alerte(url_base: str, cle_api: str) -> None:
     if dernier_ticket is not None:
         st.success(f"Ticket créé : {dernier_ticket['ticket_id']} — criticité {dernier_ticket['criticite']}")
 
-    st.caption(
-        "En production, ces tickets sont créés automatiquement par le pipeline de données (Bloc 3) à chaque "
-        "détection. Ce formulaire sert à simuler cette création pour la démonstration et les tests."
-    )
     machine_id = st.number_input("Identifiant machine", min_value=1, max_value=100, value=1, step=1)
     mesures_texte = st.text_area(
         "Mesures (JSON)", height=200,
@@ -294,7 +291,10 @@ def main() -> None:
     url_base, cle_api = _config_api()
 
     if not cle_api:
-        st.info("Saisissez la clé API dans la barre latérale pour commencer.")
+        st.error(
+            "Configuration serveur incomplète (API_KEY manquante). "
+            "Contactez l'équipe technique — voir docker-compose.yml."
+        )
         return
 
     onglet1, onglet2, onglet3, onglet4 = st.tabs(
