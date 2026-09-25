@@ -1,13 +1,14 @@
 # Lance l'API et l'interface de supervision ensemble — usage local ET
 # cible reelle de deploiement (voir .github/workflows/ci.yml, job
-# "deploiement", differe jusqu'au provisionnement OVHcloud).
+# "deploiement", deploiement reel effectue manuellement avec succes,
+# voir README).
 #
-# Ce meme fichier tourne aussi tel quel sur l'instance Compute
-# OVHcloud de production (pas de Kubernetes ni de registre de
-# conteneurs — 2 conteneurs sur une seule petite instance ne justifient
-# pas cette complexite/ce cout). Cette instance est partagee avec Kafka
-# et ClickHouse auto-heberges du Bloc 3 (memes raisons de cout) — voir
-# le README du Bloc 2 pour le detail des tarifs et la justification
+# Ce meme fichier tourne aussi tel quel sur l'instance Compute de
+# production (cloud souverain europeen, pas de Kubernetes ni de
+# registre de conteneurs — 2 conteneurs sur une seule petite instance
+# ne justifient pas cette complexite/ce cout). Cette instance est
+# partagee avec Kafka et ClickHouse auto-heberges du Bloc 3 (memes
+# raisons de cout) — voir le README du Bloc 2 pour la justification
 # complete de ces choix d'infrastructure.
 services:
   api:
