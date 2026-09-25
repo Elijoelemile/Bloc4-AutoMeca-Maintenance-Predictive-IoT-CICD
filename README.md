@@ -89,6 +89,9 @@ docker compose up --build
 Le démarrage du service API prend ~20-30 secondes (préchargement des modèles et des explainers SHAP,
 voir `app/main.py`) avant que `/sante` et l'interface ne répondent.
 
+> [!NOTE]
+> Sur l'instance Compute de déploiement réel (voir README du Bloc 2), ces mêmes ports sont exposés sur l'IP publique de l'instance, pas sur `localhost`. Aucune IP n'est publiée ici : l'instance n'est allumée que pendant les fenêtres de test/démonstration, une IP fixe deviendrait vite obsolète (voir README du Bloc 3 pour le même choix côté Kafka/ClickHouse/Grafana). La démonstration en conditions réelles se fait via la vidéo (voir grille officielle des livrables).
+
 ## Stack technique
 
 - 🐍 **FastAPI / Pydantic** — service de prédiction et de tickets
