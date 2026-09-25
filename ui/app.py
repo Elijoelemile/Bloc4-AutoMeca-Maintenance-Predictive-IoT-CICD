@@ -266,43 +266,6 @@ def onglet_monitoring(url_base: str, cle_api: str) -> None:
             )
 
 
-def onglet_a_propos() -> None:
-    st.subheader("À propos de ce service")
-
-    principes = [
-        (
-            "🔒", "Portée des données",
-            "Ce système ne traite que des mesures capteur et des attributs machine (`machine_id`, valeurs "
-            "agrégées). Il ne reçoit et ne traite **jamais** de donnée liée à un opérateur, une équipe ou un "
-            "poste : la non-discrimination entre équipes/postes est garantie structurellement par l'absence "
-            "de ces variables dans les modèles, pas par une règle ajoutée après coup.",
-        ),
-        (
-            "🔍", "Explicabilité",
-            "Chaque ticket peut afficher les facteurs ayant le plus contribué à l'alerte (méthode SHAP), "
-            "pour que le technicien comprenne la décision plutôt que de la subir.",
-        ),
-        (
-            "🧑‍🔧", "Supervision humaine",
-            "Un ticket de criticité élevée reste en attente tant qu'un technicien senior ne l'a pas validé "
-            "explicitement : ce système ne déclenche jamais seul une action corrective.",
-        ),
-        (
-            "♿", "Accessibilité",
-            "Uniquement des composants natifs Streamlit (aucun HTML/JS injecté), un label explicite sur "
-            "chaque champ, une information critique toujours donnée en texte (jamais par la couleur seule). "
-            "Limite assumée : les tableaux interactifs (`st.dataframe`) ont des limites connues côté lecteur "
-            "d'écran — l'information essentielle est donc dupliquée en texte simple au-dessus.",
-        ),
-    ]
-    colonnes = st.columns(2)
-    for i, (icone, titre, texte) in enumerate(principes):
-        with colonnes[i % 2]:
-            with st.container(border=True):
-                st.markdown(f"#### {icone} {titre}")
-                st.write(texte)
-
-
 def main() -> None:
     st.title("AutoMeca Systems — Supervision maintenance prédictive")
     url_base, cle_api = _config_api()
@@ -314,17 +277,13 @@ def main() -> None:
         )
         return
 
-    onglet1, onglet2, onglet3, onglet4 = st.tabs(
-        ["📋 Tickets", "➕ Nouvelle alerte", "📈 Monitoring", "ℹ️ À propos"]
-    )
+    onglet1, onglet2, onglet3 = st.tabs(["📋 Tickets", "➕ Nouvelle alerte", "📈 Monitoring"])
     with onglet1:
         onglet_tickets(url_base, cle_api)
     with onglet2:
         onglet_nouvelle_alerte(url_base, cle_api)
     with onglet3:
         onglet_monitoring(url_base, cle_api)
-    with onglet4:
-        onglet_a_propos()
 
 
 if __name__ == "__main__":
