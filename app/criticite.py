@@ -22,10 +22,12 @@ import joblib
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
-# Seuil calcule sur les donnees de validation reelles du modele RUL
-# (85e percentile de P(panne sous 7 jours) parmi les observations
-# evaluees dans le depot solution-IA, notebooks/02_prediction_rul.ipynb
-# — ~15% des observations flaguees, ~38% des vraies pannes couvertes).
+# Seuil calibre au 85e percentile de P(panne sous 7 jours) sur le jeu
+# de test du modele RUL — ~15% des observations flaguees, ~32% des
+# vraies pannes couvertes. Calcul detaille et reproductible dans
+# notebooks/02_prediction_rul.ipynb (depot solution-IA, section 5.4) ;
+# valeur figee lors du calibrage initial, pas recalculee automatiquement
+# a chaque reexecution du notebook.
 SEUIL_PROBA_PANNE_7J = 0.335
 HORIZON_JOURS = 7
 
